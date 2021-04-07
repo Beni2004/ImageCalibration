@@ -49,8 +49,13 @@ class CalibrationPipe():
             data = i[0].data
             l.append(data)
             
-        for i in range(len(images)):
-            np.add(l[i] + l[i + 1])
+        for i in range(len(images) - 1):
+            l[i] = np.add(l[i], l[i + 1])
+        
+        stacked_images = np.true_divide(l[i], len(images))
+        print(stacked_images)
+            
+        
         
               
         
@@ -63,5 +68,8 @@ d = fits.open('HAT-P-10-001light.fit')
 
 calibPip = CalibrationPipe(a, b, c, d)
 calibPip.calibrate()
+
+imgs = [fits.open(a), b]
+calibPip.stack_images(imgs)
 
 print("stop")
