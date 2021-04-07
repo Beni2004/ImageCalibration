@@ -48,6 +48,9 @@ class CalibrationPipe():
         for i in images:
             data = i[0].data
             l.append(data)
+            
+        for i in range(len(images)):
+            np.add(l[i] + l[i + 1])
         
               
         
