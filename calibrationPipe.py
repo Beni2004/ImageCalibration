@@ -21,7 +21,7 @@ class CalibrationPipe():
         imagedata = self.flat_frame(imagedata, flatdata)
         
         self.image[0].data = imagedata
-        self.image.writeto("zetafile.fts")
+        # self.image.writeto("zetafile.fts")
         
     def verifyHeaderDark(self):
         if self.image[0].header["DATE"] != self.dark[0].header["DATE"]:
@@ -36,15 +36,19 @@ class CalibrationPipe():
         return imagedata
     
     def flat_frame(self, imagedata, flatdata):
-        a = imagedata[10][20]
         imagedata = np.divide(imagedata, flatdata)
-        if imagedata[10][20] == a / flatdata[10][20]:
-            print("mhm")
         return imagedata
     
     def dark_frame(self, imagedata, darkdata):
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
+    
+    def stack_images(self, images):
+        l = []
+        for i in images:
+            data = i[0].data
+            l.append(data)
+        
               
         
 print("start")
