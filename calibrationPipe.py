@@ -46,8 +46,10 @@ class CalibrationPipe():
         
 print("start")
 
-a = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/gammafile.fts')
-b = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/betafile.fts')
+a = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts')
+b = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/HAT-P-10-001dark.fit')
+c = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/Bias-001.fit')
+d = fits.open('C:/Users/simon/OneDrive/Dokumente/Praktikum CSH/CalibrationPipe/HAT-P-10-001light.fit')
 
 calibPip = CalibrationPipe(a, b)
 calibPip.calibrate()
