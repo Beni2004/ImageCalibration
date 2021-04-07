@@ -56,15 +56,10 @@ class CalibrationPipe():
         
 print("start")
 
-
-a_path = fits.util.get_testdata_filepath('2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts')
-b_path = fits.util.get_testdata_filepath('HAT-P-10-001dark.fit')
-c_path = fits.util.get_testdata_filepath('Bias-001.fit')
-d_path = fits.util.get_testdata_filepath('HAT-P-10-001light.fit')
-
-b = fits.open(b_path)
-c = fits.open(c_path)
-d = fits.open(d_path)
+a = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
+b = fits.open('HAT-P-10-001dark.fit')
+c = fits.open('Bias-001.fit')
+d = fits.open('HAT-P-10-001light.fit')
 
 calibPip = CalibrationPipe(a, b, c, d)
 calibPip.calibrate()
