@@ -1,6 +1,8 @@
 from astropy.io import fits
 import numpy as np
 import statistics
+import time
+from multiprocessing import Process
 
 class CalibrationPipe():
     def __init__(self, image_path, dark, bias, flat):
@@ -23,7 +25,7 @@ class CalibrationPipe():
         imagedata = self.flat_frame(imagedata, flatdata)
         
         self.image[0].data = imagedata
-        # self.image.writeto("zetafile.fts")
+        # self.image.writeto("output.fts")
         
     def verifyDateDark(self):
         if self.image[0].header["DATE"] != self.dark[0].header["DATE"]:
@@ -46,7 +48,7 @@ class CalibrationPipe():
         imagedata = np.divide(imagedata, flatdata)
         return imagedata
     
-    def dark_frame(self, imagedata, darkdatay, biasdata):
+    def dark_frame(self, imagedata, darkdata, biasdata):
         darkdata = np.subtract(darkdata, biasdata)
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
@@ -83,7 +85,7 @@ class CalibrationPipe():
             stacked_images = np.true_divide(l[i], len(images))
             master_image[0].data = stacked_images
             master_image.writeto("gammafile.fts")
-            print(stacked_images)      
+            print(stacked_images)    
         
 print("start")
 
@@ -96,8 +98,10 @@ e = fits.open("Reg_2021-04-03T19-27-40_M51_Red_200s_Simon-H.fit")
 calibPip = CalibrationPipe(a, b, c, d)
 calibPip.calibrate()
 
+t = time.time()
 imgs = [fits.open(a), e]
 calibPip.stack_images(imgs, "median")
+print(time.time() - t)
 calibPip.stack_images(imgs, "average")
 
 print("stop")
