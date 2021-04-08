@@ -4,6 +4,8 @@ import statistics
 import time
 from multiprocessing import Process
 
+t = time.time()
+
 class CalibrationPipe():
     def __init__(self, image_path, dark, bias, flat):
         self.image = fits.open(image_path)
@@ -117,13 +119,13 @@ image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
 b = fits.open('HAT-P-10-001dark.fit')
 c = fits.open('Bias-001.fit')
 d = fits.open('HAT-P-10-001light.fit')
-e = fits.open("Reg_2021-04-03T19-27-40_M51_Red_200s_Simon-H.fit")
+e = fits.open("Reg_2021-03-31T23-55-09_M51_Red_280s_Benjamin-A.fit")
 
 calibPip = CalibrationPipe(image_path, b, c, d)
 calibPip.calibrate()
 
-t = time.time()
-imgs = [fits.open(a), e]
+
+imgs = [fits.open(image_path), e]
 calibPip.stack_images(imgs, "median")
 print(time.time() - t)
 calibPip.stack_images(imgs, "average")
