@@ -18,6 +18,11 @@ class CalibrationPipe():
         biasdata = self.bias[0].data
         flatdata = self.flat[0].data
         
+        amounty=len(imagedata)
+        amountx=len(imagedata[0])
+        
+        imagedata = run_check(imagedata, amountx, amounty)
+        
         imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
         imagedata = self.bias_frame(imagedata, biasdata)
@@ -25,7 +30,11 @@ class CalibrationPipe():
         imagedata = self.flat_frame(imagedata, flatdata)
         
         self.image[0].data = imagedata
-        # self.image.writeto("output.fts")
+        self.image.writeto("output.fts")
+    
+    def close(self):
+        self.image.close()
+        
         
     def verifyDateDark(self):
         if self.image[0].header["DATE"] != self.dark[0].header["DATE"]:
@@ -85,17 +94,32 @@ class CalibrationPipe():
             stacked_images = np.true_divide(l[i], len(images))
             master_image[0].data = stacked_images
             master_image.writeto("gammafile.fts")
-            print(stacked_images)    
+            print(stacked_images)
+            
+def remove_hotpixel(x, y, imagedata):
+    Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
+    #Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
+    average=Sum//4
+    value=imagedata[y, x]
+    if value-average>200:
+        imagedata[y, x]=average
+    return imagedata
+    
+    
+def run_check(imagedata, amountx, amounty):
+    for y in range(amounty-1):
+        for x in range(amountx-1):
+            return remove_hotpixel(x, y, imagedata)
         
 print("start")
 
-a = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
+image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
 b = fits.open('HAT-P-10-001dark.fit')
 c = fits.open('Bias-001.fit')
 d = fits.open('HAT-P-10-001light.fit')
 e = fits.open("Reg_2021-04-03T19-27-40_M51_Red_200s_Simon-H.fit")
 
-calibPip = CalibrationPipe(a, b, c, d)
+calibPip = CalibrationPipe(image_path, b, c, d)
 calibPip.calibrate()
 
 t = time.time()
@@ -103,5 +127,7 @@ imgs = [fits.open(a), e]
 calibPip.stack_images(imgs, "median")
 print(time.time() - t)
 calibPip.stack_images(imgs, "average")
+
+calibPip.close()
 
 print("stop")
