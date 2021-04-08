@@ -98,20 +98,20 @@ class CalibrationPipe():
             master_image.writeto("gammafile.fts")
             print(stacked_images)
             
-def remove_hotpixel(x, y, imagedata):
-    Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
-    #Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
-    average=Sum//4
-    value=imagedata[y, x]
-    if value-average>200:
-        imagedata[y, x]=average
-    return imagedata
-    
-    
-def run_check(imagedata, amountx, amounty):
-    for y in range(amounty-1):
-        for x in range(amountx-1):
-            return remove_hotpixel(x, y, imagedata)
+    def remove_hotpixel(x, y, imagedata):
+        Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
+        #Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
+        average=Sum//4
+        value=imagedata[y, x]
+        if value-average>200:
+            imagedata[y, x]=average
+        return imagedata
+        
+        
+    def run_check(imagedata, amountx, amounty):
+        for y in range(amounty-1):
+            for x in range(amountx-1):
+                return remove_hotpixel(x, y, imagedata)
         
 print("start")
 
