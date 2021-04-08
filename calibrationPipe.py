@@ -105,13 +105,12 @@ class CalibrationPipe():
         value=imagedata[y, x]
         if value-average>200:
             imagedata[y, x]=average
-        return imagedata
         
         
     def run_check(imagedata, amountx, amounty):
         for y in range(amounty-1):
             for x in range(amountx-1):
-                return remove_hotpixel(x, y, imagedata)
+                remove_hotpixel(x, y, imagedata)
         
 print("start")
 
