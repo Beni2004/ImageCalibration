@@ -16,7 +16,7 @@ class CalibrationPipe():
         biasdata = self.bias[0].data
         flatdata = self.flat[0].data
         
-        imagedata = self.dark_frame(imagedata, darkdata)
+        imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
         imagedata = self.bias_frame(imagedata, biasdata)
         
@@ -25,13 +25,18 @@ class CalibrationPipe():
         self.image[0].data = imagedata
         # self.image.writeto("zetafile.fts")
         
-    def verifyHeaderDark(self):
+    def verifyDateDark(self):
         if self.image[0].header["DATE"] != self.dark[0].header["DATE"]:
             return False
     
-    def verifyHeaderBias(self):
+    def verifyDateBias(self):
         if self.image[0].header["DATE"] != self.bias[0].header["DATE"]:
             return False
+        
+    def scale_dark(self):
+        if self.dark[0].header["EXPTIME"] != self.image[0].header["EXPTIME"]:
+            # ...
+            pass
     
     def bias_frame(self, imagedata, biasdata):
         imagedata = np.subtract(imagedata, biasdata)
@@ -41,7 +46,8 @@ class CalibrationPipe():
         imagedata = np.divide(imagedata, flatdata)
         return imagedata
     
-    def dark_frame(self, imagedata, darkdata):
+    def dark_frame(self, imagedata, darkdatay, biasdata):
+        darkdata = np.subtract(darkdata, biasdata)
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
     
@@ -54,8 +60,8 @@ class CalibrationPipe():
             for i in images:
                 l.append(i[0].data.astype("uint"))
                 
-            for y in range(4095):
-                for x in range(4095):
+            for y in range(4096):
+                for x in range(4096):
                     m = []
                     for i in l:
                         m.append(i[x][y])
