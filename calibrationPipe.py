@@ -3,6 +3,8 @@ import numpy as np
 import statistics
 import time
 from multiprocessing import Process
+import queue
+# import matplotlib.pyplot as plt
 
 t = time.time()
 
@@ -79,7 +81,7 @@ class CalibrationPipe():
                     for i in l:
                         m.append(i[x][y])
                     master_image_data[x][y] = statistics.median(m)
-                    # print("iteration")
+
             print(master_image_data)
             master_image[0].data = master_image_data
             master_image.writeto("deltafile.fts")
@@ -111,8 +113,8 @@ class CalibrationPipe():
     def run_check(self, imagedata, amountx, amounty):
         for y in range(amounty-1):
             for x in range(amountx-1):
-                data = self.remove_hotpixel(x, y, imagedata)
-        return data  
+                data = remove_hotpixel(x, y, imagedata)
+        return imagedata
         
 print("start")
 
@@ -125,8 +127,26 @@ e = fits.open("Reg_2021-03-31T23-55-09_M51_Red_280s_Benjamin-A.fit")
 calibPip = CalibrationPipe(image_path, b, c, d)
 calibPip.calibrate()
 
+"""timeStats = []
+startTime = time.time()
+imgs = [c, c]
+calibPip.stack_images(imgs, "median")
+timeStats.append(time.time() - startTime)
 
-imgs = [fits.open(image_path), e]
+startTime = time.time()
+imgs = [c, c, c]
+calibPip.stack_images(imgs, "median")
+timeStats.append(time.time() - startTime)
+
+startTime = time.time()
+imgs = [c, c, c, c]
+calibPip.stack_images(imgs, "median")
+timeStats.append(time.time() - startTime)
+
+plt.plot([1,2,3], timeStats)
+plt.show()"""
+
+
 calibPip.stack_images(imgs, "median")
 print(time.time() - t)
 calibPip.stack_images(imgs, "average")
