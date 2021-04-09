@@ -22,19 +22,21 @@ class CalibrationPipe():
         biasdata = self.bias[0].data
         flatdata = self.flat[0].data
         
+        #imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+        
+        #imagedata = self.bias_frame(imagedata, biasdata)
+        
+        #imagedata = self.flat_frame(imagedata, flatdata)
+        
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
-        imagedata = self.run_check(imagedata, amountx, amounty)
+        imagedata = self.run_check(imagedata, 0, 0, amountx, amounty//2)
         
-        imagedata = self.dark_frame(imagedata, darkdata, biasdata)
-        
-        imagedata = self.bias_frame(imagedata, biasdata)
-        
-        imagedata = self.flat_frame(imagedata, flatdata)
+        imagedata = self.run_check(imagedata, 0, amounty//2, amountx, amounty//2)
         
         self.image[0].data = imagedata
-        self.image.writeto("output.fts")
+        self.image.writeto("output.fts", overwrite=True)
     
     def close(self):
         self.image.close()
@@ -84,7 +86,7 @@ class CalibrationPipe():
 
             print(master_image_data)
             master_image[0].data = master_image_data
-            master_image.writeto("deltafile.fts")
+            master_image.writeto("deltafile.fts", overwrite=True)
                        
         elif calculation == "average":
             l = []
@@ -97,24 +99,26 @@ class CalibrationPipe():
         
             stacked_images = np.true_divide(l[i], len(images))
             master_image[0].data = stacked_images
-            master_image.writeto("gammafile.fts")
+            master_image.writeto("gammafile.fts", overwrite=True)
             print(stacked_images)
             
     def remove_hotpixel(self, x, y, imagedata):
-        Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
-        #Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
-        average=Sum//4
+        #Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
+        Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
+        av=Sum//2
         value=imagedata[y, x]
-        if value>1.5*average:
-            imagedata[y, x]=average
+        if value > 1.25*av:
+            imagedata[y, x]=av
         return imagedata
         
-        
-    def run_check(self, imagedata, amountx, amounty):
+    def run_check(self, imagedata, startx, starty, amountx, amounty):
         for y in range(amounty-1):
-            for x in range(amountx-1):
-                data = remove_hotpixel(x, y, imagedata)
-        return imagedata
+            for x in range(amountx):
+                try:
+                    data = self.remove_hotpixel(x + startx, y + starty, imagedata)
+                except IndexError:
+                    pass
+        return data  
         
 print("start")
 
@@ -146,11 +150,15 @@ timeStats.append(time.time() - startTime)
 plt.plot([1,2,3], timeStats)
 plt.show()"""
 
-
+now=time.time()
+imgs = [fits.open(image_path), e]
 calibPip.stack_images(imgs, "median")
-print(time.time() - t)
 calibPip.stack_images(imgs, "average")
 
+
 calibPip.close()
+
+print('stashing: ' + str(time.time() - now))
+print('total: ' + str(time.time() - t))
 
 print("stop")
