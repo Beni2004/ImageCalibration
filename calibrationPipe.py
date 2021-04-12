@@ -38,22 +38,24 @@ class CalibrationPipe():
         biasdata = self.biasdata
         flatdata = self.flatdata
         
-        imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+        # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
-        imagedata = self.bias_frame(imagedata, biasdata)
+        # imagedata = self.bias_frame(imagedata, biasdata)
         
-        imagedata = self.flat_frame(imagedata, flatdata)
+        # imagedata = self.flat_frame(imagedata, flatdata)
         
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
-        # q1 = Queue()
-        # q2 = Queue()
+        q1 = mp.Queue()
+        q2 = mp.Queue()
+        q3 = mp.Queue()
+        q4 = mp.Queue()
         
         print("Starting multiprocessing...")
-        
+        t_start = time.time()
         processes = []
-        for i in [(imagedata, 0, 0, amountx, amounty//2), (imagedata, 0, amounty//2, amountx, amounty//2)]:
+        for i in [(imagedata, 0, 0, amountx, amounty//4, q1), (imagedata, 0, amounty//4, amountx, amounty//4, q2), (imagedata, 0, amounty//2, amountx, amounty//4, q3), (imagedata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
             p = mp.Process(target = self.run_check, args = i)
             processes.append(p)
             print("Iteration")
@@ -61,26 +63,17 @@ class CalibrationPipe():
         [x.start() for x in processes]
             
         print("All processes should have started now")
-        
+        imagedata1 = q1.get()
+        imagedata2 = q2.get()
+        imagedata3 = q3.get()
+        imagedata4 = q4.get()
         [x.join() for x in processes]
         
-        # imagedata1 = q1.get()
-        # imagedata2 = q2.get()
+        arr = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//2], imagedata4[3*amounty//2:amounty]), axis=0)
         
-        """ctx = mp.get_context('spawn')
-        
-        q1 = ctx.Queue()
-        q2 = ctx.Queue()
-            
-        p1 = ctx.Process(target=self.run_check, args=(imagedata, 0, 0, amountx, amounty//2, q1))
-        p2 = ctx.Process(target=self.run_check, args=(imagedata, 0, amounty//2, amountx, amounty//2, q2))
-        
-        p1.start()
-        p2.start()
-        imagedata_1 = q1.get()
-        imagedata_2 = q2.get()
-        p1.join()
-        p2.join()"""
+        print("imgdat1:", imagedata1)
+        print("imgdat2:", imagedata2)
+        print("total time:", time.time()-t_start)
         
         # imagedata = self.run_check(imagedata, 0, 0, amountx, amounty//2)
         
@@ -89,9 +82,6 @@ class CalibrationPipe():
         with fits.open(self.imagepath) as image:
             image[0].data = imagedata
             image.writeto("output.fts", overwrite=True)
-    
-    """def close(self):
-        self.image.close()"""
         
         
     def verifyDateDark(self):
@@ -119,7 +109,31 @@ class CalibrationPipe():
         darkdata = np.subtract(darkdata, biasdata)
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
-    
+            
+    def remove_hotpixel(self, x, y, imagedata):
+        #Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
+        Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
+        av=Sum//2
+        value=imagedata[y, x]
+        if value > 1.25*av:
+            imagedata[y, x]=av
+        return imagedata
+        
+    def run_check(self, imagedata, startx, starty, amountx, amounty, q):
+        print("A process was started")
+        for y in range(amounty-1):
+            for x in range(amountx):
+                try:
+                    data = self.remove_hotpixel(x + startx, y + starty, imagedata)
+                except IndexError:
+                    pass
+        print("Process finished")
+        q.put(data)
+        
+class ImageCombiner():
+    def __init__(self):
+        pass
+        
     def stack_images(self, images, calculation):
         master_image = images[0]
         master_image_data = master_image[0].data
@@ -151,28 +165,8 @@ class CalibrationPipe():
         
             stacked_images = np.true_divide(l[i], len(images))
             master_image[0].data = stacked_images
-            master_image.writeto("gammafile.fts", overwrite=True)
+            master_image.writeto("masterfile.fts", overwrite=True)
             print(stacked_images)
-            
-    def remove_hotpixel(self, x, y, imagedata):
-        #Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
-        Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
-        av=Sum//2
-        value=imagedata[y, x]
-        if value > 1.25*av:
-            imagedata[y, x]=av
-        return imagedata
-        
-    def run_check(self, imagedata, startx, starty, amountx, amounty):
-        print("A process was started")
-        for y in range(amounty-1):
-            for x in range(amountx):
-                try:
-                    data = self.remove_hotpixel(x + startx, y + starty, imagedata)
-                except IndexError:
-                    pass
-        print(data)
-        # q.put(data)  
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
