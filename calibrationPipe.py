@@ -10,6 +10,8 @@ from queue import Queue
 
 t = time.time()
 
+progress=0
+
 class CalibrationPipe():
     def __init__(self, image_path, dark_path, bias_path, flat_path):
         with fits.open(image_path) as image:
@@ -46,6 +48,7 @@ class CalibrationPipe():
         
         amounty=len(imagedata)
         amountx=len(imagedata[0])
+        total_area=amountx*amounty
         
         q1 = mp.Queue()
         q2 = mp.Queue()
@@ -120,6 +123,7 @@ class CalibrationPipe():
         return imagedata
         
     def run_check(self, imagedata, startx, starty, amountx, amounty, q):
+        global progress
         print("A process was started")
         for y in range(amounty-1):
             for x in range(amountx):
@@ -127,6 +131,11 @@ class CalibrationPipe():
                     data = self.remove_hotpixel(x + startx, y + starty, imagedata)
                 except IndexError:
                     pass
+                area=x*y
+                percent=100*area/total_area
+                if percent - progress >=5:
+                    progress=percent
+                    print(str(progress) + " %")
         print("Process finished")
         q.put(data)
         
@@ -172,6 +181,7 @@ if __name__ == '__main__':
     mp.set_start_method('spawn')
 
     print("start")
+    print(str(progress) + " %")
 
     image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
     b = 'HAT-P-10-001dark.fit'
