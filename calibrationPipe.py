@@ -3,10 +3,7 @@ import numpy as np
 import statistics
 import time
 import multiprocessing as mp
-import os
-# from multiprocessing import Process
-from queue import Queue
-# import matplotlib.pyplot as plt
+import math
 
 t = time.time()
 
@@ -31,7 +28,7 @@ class CalibrationPipe():
             self.flathdr = flat[0].header
         
         self.imagepath = image_path
-        # self.image.info()
+        
         
     def run(self):
         print("ruuuuun!")
@@ -40,15 +37,35 @@ class CalibrationPipe():
         biasdata = self.biasdata
         flatdata = self.flatdata
         
+        amounty=len(imagedata)
+        amountx=len(imagedata[0])
+        
+        # darkdata = self.scale_dark(darkdata, amountx, amounty)
+        
+        q1 = mp.Queue()
+        q2 = mp.Queue()
+        q3 = mp.Queue()
+        q4 = mp.Queue()
+        
+        processes = []
+        for i in [(darkdata, 0, 0, amountx, amounty//4, q1), (darkdata, 0, amounty//4, amountx, amounty//4, q2), (darkdata, 0, amounty//2, amountx, amounty//4, q3), (darkdata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
+            p = mp.Process(target = self.scale_dark, args = i)
+            processes.append(p)
+            p.start()
+        
+        darkdata1 = q1.get()
+        darkdata2 = q2.get()
+        darkdata3 = q3.get()
+        darkdata4 = q4.get()
+        [x.join() for x in processes]
+        
+        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//2:amounty]), axis=0)
+        
         # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
         # imagedata = self.bias_frame(imagedata, biasdata)
         
         # imagedata = self.flat_frame(imagedata, flatdata)
-        
-        amounty=len(imagedata)
-        amountx=len(imagedata[0])
-        total_area=amountx*amounty
         
         q1 = mp.Queue()
         q2 = mp.Queue()
@@ -72,15 +89,11 @@ class CalibrationPipe():
         imagedata4 = q4.get()
         [x.join() for x in processes]
         
-        arr = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//2], imagedata4[3*amounty//2:amounty]), axis=0)
+        imagedata = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//2], imagedata4[3*amounty//2:amounty]), axis=0)
         
         print("imgdat1:", imagedata1)
         print("imgdat2:", imagedata2)
-        print("total time:", time.time()-t_start)
-        
-        # imagedata = self.run_check(imagedata, 0, 0, amountx, amounty//2)
-        
-        # imagedata = self.run_check(imagedata, 0, amounty//2, amountx, amounty//2)
+        print("removal time:", time.time()-t_start)
         
         with fits.open(self.imagepath) as image:
             image[0].data = imagedata
@@ -95,10 +108,19 @@ class CalibrationPipe():
         if self.imagehdr["DATE"] != self.biashdr["DATE"]:
             return False
         
-    def scale_dark(self):
+    def scale_dark(self, darkdata, startx, starty, amountx, amounty, q):
         if self.darkhdr["EXPTIME"] != self.imagehdr["EXPTIME"]:
-            # ...
-            pass
+            scaling_factor = 1
+            delta_t = math.sqrt((self.darkhdr["EXPTIME"] - self.imagehdr["EXPTIME"]) ** 2)
+            
+            for y in range(amounty):
+                for x in range(amountx):
+                    darkdata[startx + x][starty + y] += (scaling_factor * delta_t)
+            
+            print(darkdata)
+            q.put(darkdata)
+        
+        return darkdata
     
     def bias_frame(self, imagedata, biasdata):
         imagedata = np.subtract(imagedata, biasdata)
@@ -124,6 +146,7 @@ class CalibrationPipe():
         
     def run_check(self, imagedata, startx, starty, amountx, amounty, q):
         global progress
+        total_area=amountx*amounty
         print("A process was started")
         for y in range(amounty-1):
             for x in range(amountx):
@@ -131,10 +154,10 @@ class CalibrationPipe():
                     data = self.remove_hotpixel(x + startx, y + starty, imagedata)
                 except IndexError:
                     pass
-                area=x*y
+                area=(x-startx)*(y-starty)
                 percent=100*area/total_area
                 if percent - progress >=5:
-                    progress=percent
+                    progress=round(percent)
                     print(str(progress) + " %")
         print("Process finished")
         q.put(data)
