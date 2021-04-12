@@ -4,6 +4,7 @@ import statistics
 import time
 import multiprocessing as mp
 import math
+import matplotlib.pyplot as plt
 
 t = time.time()
 
@@ -36,6 +37,10 @@ class CalibrationPipe():
         darkdata = self.darkdata
         biasdata = self.biasdata
         flatdata = self.flatdata
+        
+        """plt.imshow(darkdata)
+        plt.colorbar(orientation='vertical')
+        plt.show()"""
         
         amounty=len(imagedata)
         amountx=len(imagedata[0])
