@@ -38,10 +38,6 @@ class CalibrationPipe():
         biasdata = self.biasdata
         flatdata = self.flatdata
         
-        """plt.imshow(darkdata)
-        plt.colorbar(orientation='vertical')
-        plt.show()"""
-        
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
@@ -95,6 +91,10 @@ class CalibrationPipe():
         [x.join() for x in processes]
         
         imagedata = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//4], imagedata4[3*amounty//4:amounty]), axis=0)
+        
+        """plt.imshow(imagedata)
+        plt.colorbar(orientation='vertical')
+        plt.show()"""
         
         print("imgdat1:", imagedata1)
         print("imgdat2:", imagedata2)
@@ -189,7 +189,7 @@ class ImageCombiner():
 
             print(master_image_data)
             master_image[0].data = master_image_data
-            master_image.writeto("deltafile.fts", overwrite=True)
+            master_image.writeto("masterfile.fts", overwrite=True)
                        
         elif calculation == "average":
             l = []
