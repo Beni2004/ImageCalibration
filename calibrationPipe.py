@@ -64,7 +64,7 @@ class CalibrationPipe():
         darkdata4 = q4.get()
         [x.join() for x in processes]
         
-        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//2:amounty]), axis=0)
+        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)
         
         # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
@@ -94,7 +94,7 @@ class CalibrationPipe():
         imagedata4 = q4.get()
         [x.join() for x in processes]
         
-        imagedata = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//2], imagedata4[3*amounty//2:amounty]), axis=0)
+        imagedata = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//4], imagedata4[3*amounty//4:amounty]), axis=0)
         
         print("imgdat1:", imagedata1)
         print("imgdat2:", imagedata2)
