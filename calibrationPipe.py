@@ -4,7 +4,7 @@ import statistics
 import time
 import multiprocessing as mp
 import math
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
 #if debug is 'True' it prints some helpful stuff, otherwise not.
 debug = True
@@ -48,6 +48,9 @@ class CalibrationPipe():
         
         # darkdata = self.scale_dark(darkdata, amountx, amounty)
         
+        """
+        if debug:
+            print("Starting multiprocessing...")
         q1 = mp.Queue()
         q2 = mp.Queue()
         q3 = mp.Queue()
@@ -67,7 +70,7 @@ class CalibrationPipe():
         
         darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)
         
-        # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+        """# imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
         # imagedata = self.bias_frame(imagedata, biasdata)
         
@@ -162,10 +165,7 @@ class CalibrationPipe():
         Sum=left+right
         av=Sum//2
         value=imagedata[y, x]
-        not_too_different=True
-        if right > 1.1*left or left > 1.1*right:
-            not_too_different=False
-        if value > 1.05*av and av < 5000 and not_too_different:
+        if value > 1.05*av and av < 5000:
             imagedata[y, x]=av
         return imagedata
     
@@ -235,7 +235,7 @@ class ImageCombiner():
             
 #runs the multiprocessing
 if __name__ == '__main__':
-    mp.set_start_method('spawn')
+    mp.set_start_method('fork')
 
     if debug:
         print("start")
