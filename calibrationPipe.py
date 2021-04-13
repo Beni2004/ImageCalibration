@@ -6,11 +6,15 @@ import multiprocessing as mp
 import math
 import matplotlib.pyplot as plt
 
+#if debug is 'True' it prints some helpful stuff, otherwise not.
+debug = True
+
 t = time.time()
 
 progress=0
 
 class CalibrationPipe():
+    #opens all images with their path
     def __init__(self, image_path, dark_path, bias_path, flat_path):
         with fits.open(image_path) as image:
             self.imagedata = image[0].data
@@ -30,9 +34,10 @@ class CalibrationPipe():
         
         self.imagepath = image_path
         
-        
+    #Executes all processes, mainly the multiprocessing for removing hotpixels    
     def run(self):
-        print("ruuuuun!")
+        if debug:
+            print("ruuuuun!")
         imagedata = self.imagedata
         darkdata = self.darkdata
         biasdata = self.biasdata
@@ -73,17 +78,20 @@ class CalibrationPipe():
         q3 = mp.Queue()
         q4 = mp.Queue()
         
-        print("Starting multiprocessing...")
+        if debug:
+            print("Starting multiprocessing...")
         t_start = time.time()
         processes = []
         for i in [(imagedata, 0, 0, amountx, amounty//4, q1), (imagedata, 0, amounty//4, amountx, amounty//4, q2), (imagedata, 0, amounty//2, amountx, amounty//4, q3), (imagedata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
-            p = mp.Process(target = self.run_check, args = i)
+            p = mp.Process(target = self.clean_image, args = i)
             processes.append(p)
-            print("Iteration")
+            if debug:
+                print("Iteration")
         
         [x.start() for x in processes]
             
-        print("All processes should have started now")
+        if debug:
+            print("All processes should have started now")
         imagedata1 = q1.get()
         imagedata2 = q2.get()
         imagedata3 = q3.get()
@@ -96,9 +104,10 @@ class CalibrationPipe():
         plt.colorbar(orientation='vertical')
         plt.show()"""
         
-        print("imgdat1:", imagedata1)
-        print("imgdat2:", imagedata2)
-        print("removal time:", time.time()-t_start)
+        if debug:
+            print("imgdat1:", imagedata1)
+            print("imgdat2:", imagedata2)
+            print("removal time:", time.time()-t_start)
         
         with fits.open(self.imagepath) as image:
             image[0].data = imagedata
@@ -122,7 +131,8 @@ class CalibrationPipe():
                 for x in range(amountx):
                     darkdata[startx + x][starty + y] += (scaling_factor * delta_t)
             
-            print(darkdata)
+            if debug:
+                print(darkdata)
             q.put(darkdata)
         
         return darkdata
@@ -140,19 +150,33 @@ class CalibrationPipe():
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
             
+    #Removes a hotpixel, if there is one. Looks at the pixels left and right of the pixel.
+    #The brightness of a hotpixel is set to the average of its two neighbors if the following conditions are true:
+    #The hotpixel needs to be at least 5 % brighter than the average of the neighbors.
+    #The two neighboring pixels have to be darker than 5000 (out of the max brightness 256^2 - 1).
+    #No one of the two neighboring pixels can be more than 10 % brighter than the other one.
     def remove_hotpixel(self, x, y, imagedata):
         #Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
-        Sum=imagedata[y, x-1].astype("uint")+imagedata[y, x+1].astype("uint")
+        left=imagedata[y, x-1].astype("uint")
+        right=imagedata[y, x+1].astype("uint")
+        Sum=left+right
         av=Sum//2
         value=imagedata[y, x]
-        if value > 1.25*av:
+        not_too_different=True
+        if right > 1.1*left or left > 1.1*right:
+            not_too_different=False
+        if value > 1.05*av and av < 5000 and not_too_different:
             imagedata[y, x]=av
         return imagedata
-        
-    def run_check(self, imagedata, startx, starty, amountx, amounty, q):
+    
+    #Runs the hotpixel check for every pixel in the image, except if the maximum y-coordinate is reached.
+    #Four processes are running simultaniously due to multiprocessing. Hence the y-axis is divided four times.
+    #It calculates the progress of the current process. If the process has gone further than 5 % since the last print, it prints the progress.
+    def clean_image(self, imagedata, startx, starty, amountx, amounty, q):
         global progress
         total_area=amountx*amounty
-        print("A process was started")
+        if debug:
+            print("A process was started")
         for y in range(amounty-1):
             for x in range(amountx):
                 try:
@@ -163,8 +187,10 @@ class CalibrationPipe():
                 percent=100*area/total_area
                 if percent - progress >=5:
                     progress=round(percent)
-                    print(str(progress) + " %")
-        print("Process finished")
+                    if debug:
+                        print(str(progress) + " %")
+        if debug:
+            print("Process finished")
         q.put(data)
         
 class ImageCombiner():
@@ -187,7 +213,8 @@ class ImageCombiner():
                         m.append(i[x][y])
                     master_image_data[x][y] = statistics.median(m)
 
-            print(master_image_data)
+            if debug:
+                print(master_image_data)
             master_image[0].data = master_image_data
             master_image.writeto("masterfile.fts", overwrite=True)
                        
@@ -203,21 +230,23 @@ class ImageCombiner():
             stacked_images = np.true_divide(l[i], len(images))
             master_image[0].data = stacked_images
             master_image.writeto("masterfile.fts", overwrite=True)
-            print(stacked_images)
-
+            if debug:
+                print(stacked_images)
+            
+#runs the multiprocessing
 if __name__ == '__main__':
     mp.set_start_method('spawn')
 
-    print("start")
-    print(str(progress) + " %")
+    if debug:
+        print("start")
+        print(str(progress) + " %")
 
-    image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts'
-    b = 'HAT-P-10-001dark.fit'
-    c = 'Bias-001.fit'
-    d = 'HAT-P-10-001light.fit'
-    e = "Reg_2021-03-31T23-55-09_M51_Red_280s_Benjamin-A.fit"
+    image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts' #path of the main image to be edited
+    dark_path = 'HAT-P-10-001dark.fit' #The dark image's path
+    bias_path = 'Bias-001.fit' #The bias image's path
+    light_path = 'HAT-P-10-001light.fit' #The light image's path
 
-    calibPip = CalibrationPipe(image_path, b, c, d)
+    calibPip = CalibrationPipe(image_path, dark_path, bias_path, light_path)
     # calibPip.close()
     calibPip.run()
 
@@ -248,7 +277,7 @@ if __name__ == '__main__':
 
     # calibPip.close()
 
-    # print('stashing: ' + str(time.time() - now))
-    print('total: ' + str(time.time() - t))
-
-    print("stop")
+    if debug:
+        #print('stashing: ' + str(time.time() - now))
+        print('total: ' + str(time.time() - t))
+        print("stop")
