@@ -68,13 +68,13 @@ class CalibrationPipe():
         darkdata4 = q4.get()
         [x.join() for x in processes]
         
-        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)
+        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)"""
         
-        """# imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+        # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
-        # imagedata = self.bias_frame(imagedata, biasdata)
+        imagedata = self.bias_frame(imagedata, biasdata)
         
-        # imagedata = self.flat_frame(imagedata, flatdata)
+        imagedata = self.flat_frame(imagedata, flatdata)
         
         q1 = mp.Queue()
         q2 = mp.Queue()
@@ -126,29 +126,41 @@ class CalibrationPipe():
             return False
         
     def scale_dark(self, darkdata, startx, starty, amountx, amounty, q):
-        if self.darkhdr["EXPTIME"] != self.imagehdr["EXPTIME"]:
-            scaling_factor = 1
-            delta_t = math.sqrt((self.darkhdr["EXPTIME"] - self.imagehdr["EXPTIME"]) ** 2)
-            
-            for y in range(amounty):
-                for x in range(amountx):
-                    darkdata[startx + x][starty + y] += (scaling_factor * delta_t)
-            
-            if debug:
-                print(darkdata)
-            q.put(darkdata)
+        #Function that scales the dark.
+        #ARGUMENTS: The dark as nparray,
+        #the x and y coordinate of the top left corner of the area of the dark that should be processed,
+        #the x and y scale of the area that should be processed and the multiprocessing queue
         
-        return darkdata
+        expt = self.imagehdr["EXPTIME"]
+        scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.darkhdr["EXPTIME"]
+        #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual exposuretime of the dark
+        #The result is the scaling factor. Each pixel then has to be multiplied with that value.
+            
+        for y in range(amounty):
+            for x in range(amountx):
+                darkdata[startx + x][starty + y] *= scaling_factor
+            
+        if debug:
+            print(darkdata)
+        q.put(darkdata)
     
     def bias_frame(self, imagedata, biasdata):
+        #Subtracts the BIAS-frame from the image
+        #Takes two nparrays as arguments
         imagedata = np.subtract(imagedata, biasdata)
         return imagedata
     
     def flat_frame(self, imagedata, flatdata):
+        #Divides the image with the flat-frame
+        #This function should be called after subtracting the dark and the BIAS
+        #Takes two nparrays as arguments
         imagedata = np.divide(imagedata, flatdata)
         return imagedata
     
     def dark_frame(self, imagedata, darkdata, biasdata):
+        #Subtracts the BIAS-frame from the darkframe and then subtracts the result from the image
+        #In other words: Calibrates the dark with the BIAS-frame and then subtracts the dark.
+        #Takes two nparrays as arguments
         darkdata = np.subtract(darkdata, biasdata)
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
@@ -194,17 +206,23 @@ class CalibrationPipe():
         q.put(data)
         
 class ImageCombiner():
+    #This class contains a function to combine images
     def __init__(self):
         pass
         
     def stack_images(self, images, calculation):
-        master_image = images[0]
-        master_image_data = master_image[0].data
+        #Function to combine images
+        #The first argument must be a list with the paths of the images as strings,
+        #the second one is a string that must be either "median" or "average", depending on the desired calculation method
+        master_image_path = images[0]
+        with fits.open(master_image_path) as master:
+            master_image_data = master[0].data
         
         if calculation == "median":
             l = []
             for i in images:
-                l.append(i[0].data.astype("uint"))
+                with fits.open(i) as image:
+                    l.append(image[0].data.astype("uint"))
                 
             for y in range(4096):
                 for x in range(4096):
@@ -215,25 +233,30 @@ class ImageCombiner():
 
             if debug:
                 print(master_image_data)
-            master_image[0].data = master_image_data
-            master_image.writeto("masterfile.fts", overwrite=True)
+                
+            with fits.open(master_image_path) as master:
+                master[0].data = master_image_data
+                master.writeto("masterfile.fts", overwrite=True)
                        
         elif calculation == "average":
             l = []
             for i in images:
-                data = i[0].data
-                l.append(data)
+                with fits.open(i) as image:
+                    data = image[0].data
+                    l.append(data)
             
             for i in range(len(images) - 1):
                 l[i] = np.add(l[i], l[i + 1])
         
             stacked_images = np.true_divide(l[i], len(images))
-            master_image[0].data = stacked_images
-            master_image.writeto("masterfile.fts", overwrite=True)
             if debug:
                 print(stacked_images)
             
 #runs the multiprocessing
+            with fits.open(master_image_path) as master:
+                master[0].data = master_image_data
+                master.writeto("masterfile.fts", overwrite=True)
+                
 if __name__ == '__main__':
     mp.set_start_method('fork')
 
@@ -247,7 +270,7 @@ if __name__ == '__main__':
     light_path = 'HAT-P-10-001light.fit' #The light image's path
 
     calibPip = CalibrationPipe(image_path, dark_path, bias_path, light_path)
-    # calibPip.close()
+    
     calibPip.run()
 
     """timeStats = []
