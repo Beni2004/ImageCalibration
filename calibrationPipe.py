@@ -1,9 +1,9 @@
 #Contributors: Benjamin A. and Simon H.
 #For Questions, feel free to contact imagecalibration-contributors@outlook.com
 #If something isn't working as it's supposed to, try:
-    #check if you have all the modules installed
+    #Have a look at line 291
+    #check if you have all the necessary modules correctly installed
     #check if you declared your filepaths correctly
-    #Have a look at line 284
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
 from astropy.io import fits
 import numpy as np
@@ -28,7 +28,7 @@ remove_hotpixels = True
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
 calibrate_with_bias = True
-calibrate_with_dark = False
+calibrate_with_dark = True
 calibrate_with_flat = True
 
 class CalibrationPipe():
@@ -68,7 +68,6 @@ class CalibrationPipe():
             if debug:
                 print("Starting multiprocessing...")
             q = mp.Queue()
-            
             processes = []
             runs = self.make_processes(darkdata, amountx, amounty, n, q)
             for i in runs:
@@ -79,6 +78,9 @@ class CalibrationPipe():
             
             for x in processes:
                 x.start()
+                
+            if debug:
+                print("All processes should have started now")
                 
             for i in range(n):
                 tupel = q.get()
@@ -159,10 +161,10 @@ class CalibrationPipe():
         scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.darkhdr["EXPTIME"]
         #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual exposuretime of the dark
         #The result is the scaling factor. Each pixel then has to be multiplied with that value.
-            
+        
         for y in range(amounty):
             for x in range(amountx):
-                darkdata[startx + x][starty + y] *= scaling_factor
+                darkdata[starty + y, startx + x] *= scaling_factor
             
         #if debug:
             #print(darkdata)
