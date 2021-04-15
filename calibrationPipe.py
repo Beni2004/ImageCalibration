@@ -1,9 +1,16 @@
+#Contributors: Benjamin A. and Simon H.
+#For Questions, feel free to contact imagecalibration-contributors@outlook.com
+#If something isn't working as it's supposed to, try:
+    #check if you have all the modules installed
+    #check if you declared your filepaths correctly
+    #Have a look at line 279
+#While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
 from astropy.io import fits
 import numpy as np
 import statistics
 import time
 import multiprocessing as mp
-import math
+#import math
 #import matplotlib.pyplot as plt
 
 #if debug is 'True' it prints some helpful stuff, otherwise not.
@@ -11,7 +18,18 @@ debug = True
 
 t = time.time()
 
+#number of processes executed at the same time
+n=32
+
 progress=0
+
+#wether or not the program should remove hotpixels or not, depends on wether you need it or not (needs a lot of time, ～1.5-2 min.).
+remove_hotpixels = True
+
+#wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
+calibrate_with_bias = False
+calibrate_with_dark = False
+calibrate_with_flat = False
 
 class CalibrationPipe():
     #opens all images with their path
@@ -46,75 +64,77 @@ class CalibrationPipe():
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
-        # darkdata = self.scale_dark(darkdata, amountx, amounty)
-        
-        """
-        if debug:
-            print("Starting multiprocessing...")
-        q1 = mp.Queue()
-        q2 = mp.Queue()
-        q3 = mp.Queue()
-        q4 = mp.Queue()
-        
-        processes = []
-        for i in [(darkdata, 0, 0, amountx, amounty//4, q1), (darkdata, 0, amounty//4, amountx, amounty//4, q2), (darkdata, 0, amounty//2, amountx, amounty//4, q3), (darkdata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
-            p = mp.Process(target = self.scale_dark, args = i)
-            processes.append(p)
-            p.start()
-        
-        darkdata1 = q1.get()
-        darkdata2 = q2.get()
-        darkdata3 = q3.get()
-        darkdata4 = q4.get()
-        [x.join() for x in processes]
-        
-        darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)"""
-        
-        # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
-        
-        imagedata = self.bias_frame(imagedata, biasdata)
-        
-        imagedata = self.flat_frame(imagedata, flatdata)
-        
-        q1 = mp.Queue()
-        q2 = mp.Queue()
-        q3 = mp.Queue()
-        q4 = mp.Queue()
-        
-        if debug:
-            print("Starting multiprocessing...")
-        t_start = time.time()
-        processes = []
-        for i in [(imagedata, 0, 0, amountx, amounty//4, q1), (imagedata, 0, amounty//4, amountx, amounty//4, q2), (imagedata, 0, amounty//2, amountx, amounty//4, q3), (imagedata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
-            p = mp.Process(target = self.clean_image, args = i)
-            processes.append(p)
-            if debug:
-                print("Iteration")
-        
-        [x.start() for x in processes]
+        if calibrate_with_dark:
+            # darkdata = self.scale_dark(darkdata, amountx, amounty)
             
-        if debug:
-            print("All processes should have started now")
-        imagedata1 = q1.get()
-        imagedata2 = q2.get()
-        imagedata3 = q3.get()
-        imagedata4 = q4.get()
-        [x.join() for x in processes]
+            """
+            if debug:
+                print("Starting multiprocessing...")
+            q1 = mp.Queue()
+            q2 = mp.Queue()
+            q3 = mp.Queue()
+            q4 = mp.Queue()
+            
+            processes = []
+            for i in [(darkdata, 0, 0, amountx, amounty//4, q1), (darkdata, 0, amounty//4, amountx, amounty//4, q2), (darkdata, 0, amounty//2, amountx, amounty//4, q3), (darkdata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
+                p = mp.Process(target = self.scale_dark, args = i)
+                processes.append(p)
+                p.start()
+            
+            darkdata1 = q1.get()
+            darkdata2 = q2.get()
+            darkdata3 = q3.get()
+            darkdata4 = q4.get()
+            [x.join() for x in processes]
+            
+            darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)"""
+            
+            # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
-        imagedata = np.concatenate((imagedata1[0:amounty//4], imagedata2[amounty//4:amounty//2], imagedata3[amounty//2:3*amounty//4], imagedata4[3*amounty//4:amounty]), axis=0)
+        if calibrate_with_bias:
+            imagedata = self.bias_frame(imagedata, biasdata)
+            
+        if calibrate_with_flat:
+            imagedata = self.flat_frame(imagedata, flatdata)
         
-        """plt.imshow(imagedata)
-        plt.colorbar(orientation='vertical')
-        plt.show()"""
-        
-        if debug:
-            print("imgdat1:", imagedata1)
-            print("imgdat2:", imagedata2)
-            print("removal time:", time.time()-t_start)
+        if remove_hotpixels:
+            if debug:
+                print("Starting multiprocessing...")
+            q = mp.Queue()
+            t_start = time.time()
+            processes = []
+            runs = self.make_processes(imagedata, amountx, amounty, n, q)
+            for i in runs:
+                p = mp.Process(target = self.clean_image, args = i)
+                processes.append(p)
+                if debug:
+                    print("Iteration")
+            
+            for x in processes:
+                x.start()
+                
+            if debug:
+                print("All processes should have started now")
+
+            for i in range(n):
+                tupel = q.get()
+                current = tupel[0]
+                pos = tupel[1]
+                imagedata = np.concatenate((imagedata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], imagedata[(pos+1)*amounty//n:amounty]), axis=0)
+            
+            if debug:
+                print("removal time:", time.time()-t_start)
         
         with fits.open(self.imagepath) as image:
             image[0].data = imagedata
             image.writeto("output.fts", overwrite=True)
+            
+    def make_processes(self, imagedata, amountx, amounty, number, q):
+        runs = []
+        for i in range(number):
+            process = (imagedata, 0, i*amounty//number, amountx, amounty//number, q, i)
+            runs.append(process)
+        return runs
         
         
     def verifyDateDark(self):
@@ -169,7 +189,6 @@ class CalibrationPipe():
     #The brightness of a hotpixel is set to the average of its two neighbors if the following conditions are true:
     #The hotpixel needs to be at least 5 % brighter than the average of the neighbors.
     #The two neighboring pixels have to be darker than 5000 (out of the max brightness 256^2 - 1).
-    #No one of the two neighboring pixels can be more than 10 % brighter than the other one.
     def remove_hotpixel(self, x, y, imagedata):
         #Sum=imagedata[y, x-1].astype("uint")+imagedata[y+1, x].astype("uint")+imagedata[y, x+1].astype("uint")+imagedata[y-1, x].astype("uint")
         left=imagedata[y, x-1].astype("uint")
@@ -184,12 +203,12 @@ class CalibrationPipe():
     #Runs the hotpixel check for every pixel in the image, except if the maximum y-coordinate is reached.
     #Four processes are running simultaniously due to multiprocessing. Hence the y-axis is divided four times.
     #It calculates the progress of the current process. If the process has gone further than 5 % since the last print, it prints the progress.
-    def clean_image(self, imagedata, startx, starty, amountx, amounty, q):
+    def clean_image(self, imagedata, startx, starty, amountx, amounty, q, p):
         global progress
         total_area=amountx*amounty
         if debug:
             print("A process was started")
-        for y in range(amounty-1):
+        for y in range(amounty):
             for x in range(amountx):
                 try:
                     data = self.remove_hotpixel(x + startx, y + starty, imagedata)
@@ -201,9 +220,9 @@ class CalibrationPipe():
                     progress=round(percent)
                     if debug:
                         print(str(progress) + " %")
+        q.put((data, p))
         if debug:
             print("Process finished")
-        q.put(data)
         
 class ImageCombiner():
     #This class contains a function to combine images
@@ -213,7 +232,7 @@ class ImageCombiner():
     def stack_images(self, images, calculation):
         #Function to combine images
         #The first argument must be a list with the paths of the images as strings,
-        #the second one is a string that must be either "median" or "average", depending on the desired calculation method
+        #the second one is a string that must be either "median" or "average", depending on the desired calculation method.
         master_image_path = images[0]
         with fits.open(master_image_path) as master:
             master_image_data = master[0].data
@@ -258,18 +277,30 @@ class ImageCombiner():
                 master.writeto("masterfile.fts", overwrite=True)
                 
 if __name__ == '__main__':
-    mp.set_start_method('fork')
+    mp.set_start_method('fork') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
 
     if debug:
         print("start")
         print(str(progress) + " %")
+    
+    image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts' #relative path of the main image to be edited
+    #If only the name of the file is given, the program and the file have to be in the same folder.
+    #The path can also be given by the files absolute path: 'folder/folder/folder/.../file', also for Windows use normal slashes
+    
+    if calibrate_with_dark:
+        dark_path = 'HAT-P-10-001dark.fit' #The dark image's path as a string
+    else:
+        dark_path = image_path
+    if calibrate_with_bias:
+        bias_path = 'Bias-001.fit' #The bias image's path as a string
+    else:
+        bias_path = image_path
+    if calibrate_with_flat:
+        flat_path = 'HAT-P-10-001light.fit' #The light image's path as a string
+    else:
+        flat_path = image_path
 
-    image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts' #path of the main image to be edited
-    dark_path = 'HAT-P-10-001dark.fit' #The dark image's path
-    bias_path = 'Bias-001.fit' #The bias image's path
-    light_path = 'HAT-P-10-001light.fit' #The light image's path
-
-    calibPip = CalibrationPipe(image_path, dark_path, bias_path, light_path)
+    calibPip = CalibrationPipe(image_path, dark_path, bias_path, flat_path)
     
     calibPip.run()
 
