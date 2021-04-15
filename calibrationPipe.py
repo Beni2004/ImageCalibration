@@ -28,7 +28,7 @@ remove_hotpixels = True
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
 calibrate_with_bias = True
-calibrate_with_dark = True
+calibrate_with_dark = False
 calibrate_with_flat = True
 
 class CalibrationPipe():
@@ -65,9 +65,6 @@ class CalibrationPipe():
         amountx=len(imagedata[0])
         
         if calibrate_with_dark:
-            # darkdata = self.scale_dark(darkdata, amountx, amounty)
-            
-            """
             if debug:
                 print("Starting multiprocessing...")
             q = mp.Queue()
@@ -75,7 +72,7 @@ class CalibrationPipe():
             processes = []
             runs = self.make_processes(darkdata, amountx, amounty, n, q)
             for i in runs:
-                p = mp.Process(target = self.dark_frame, args = i)
+                p = mp.Process(target = self.scale_dark, args = i)
                 processes.append(p)
                 if debug:
                     print("Iteration")
@@ -87,13 +84,11 @@ class CalibrationPipe():
                 tupel = q.get()
                 current = tupel[0]
                 pos = tupel[1]
-                darkdata = np.concatenate((darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], dark[(pos+1)*amounty//n:amounty]), axis=0)
+                darkdata = np.concatenate((darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], darkdata[(pos+1)*amounty//n:amounty]), axis=0)
             
             [x.join() for x in processes]
             
-            darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)"""
-            
-            # imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+            imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
         if calibrate_with_bias:
             imagedata = self.bias_frame(imagedata, biasdata)
@@ -144,16 +139,21 @@ class CalibrationPipe():
     def verifyDateDark(self):
         if self.imagehdr["DATE"] != self.darkhdr["DATE"]:
             return False
+        return True
     
     def verifyDateBias(self):
         if self.imagehdr["DATE"] != self.biashdr["DATE"]:
             return False
+        return True
         
-    def scale_dark(self, darkdata, startx, starty, amountx, amounty, q):
+    def scale_dark(self, darkdata, startx, starty, amountx, amounty, q, p):
         #Function that scales the dark.
         #ARGUMENTS: The dark as nparray,
-        #the x and y coordinate of the top left corner of the area of the dark that should be processed,
+        #the x and y coordinate of the bottom left corner of the area of the dark that should be processed,
         #the x and y scale of the area that should be processed and the multiprocessing queue
+        
+        if debug:
+            print("A process was started")
         
         expt = self.imagehdr["EXPTIME"]
         scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.darkhdr["EXPTIME"]
@@ -164,9 +164,11 @@ class CalibrationPipe():
             for x in range(amountx):
                 darkdata[startx + x][starty + y] *= scaling_factor
             
+        #if debug:
+            #print(darkdata)
+        q.put((darkdata, p))
         if debug:
-            print(darkdata)
-        q.put(darkdata)
+            print("Process finished")
     
     def bias_frame(self, imagedata, biasdata):
         #Subtracts the BIAS-frame from the image
