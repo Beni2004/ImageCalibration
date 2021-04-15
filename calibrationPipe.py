@@ -3,7 +3,7 @@
 #If something isn't working as it's supposed to, try:
     #check if you have all the modules installed
     #check if you declared your filepaths correctly
-    #Have a look at line 279
+    #Have a look at line 284
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
 from astropy.io import fits
 import numpy as np
@@ -27,9 +27,9 @@ progress=0
 remove_hotpixels = True
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
-calibrate_with_bias = False
-calibrate_with_dark = False
-calibrate_with_flat = False
+calibrate_with_bias = True
+calibrate_with_dark = True
+calibrate_with_flat = True
 
 class CalibrationPipe():
     #opens all images with their path
@@ -70,21 +70,25 @@ class CalibrationPipe():
             """
             if debug:
                 print("Starting multiprocessing...")
-            q1 = mp.Queue()
-            q2 = mp.Queue()
-            q3 = mp.Queue()
-            q4 = mp.Queue()
+            q = mp.Queue()
             
             processes = []
-            for i in [(darkdata, 0, 0, amountx, amounty//4, q1), (darkdata, 0, amounty//4, amountx, amounty//4, q2), (darkdata, 0, amounty//2, amountx, amounty//4, q3), (darkdata, 0, 3*amounty//4, amountx, amounty//4, q4)]:
-                p = mp.Process(target = self.scale_dark, args = i)
+            runs = self.make_processes(darkdata, amountx, amounty, n, q)
+            for i in runs:
+                p = mp.Process(target = self.dark_frame, args = i)
                 processes.append(p)
-                p.start()
+                if debug:
+                    print("Iteration")
             
-            darkdata1 = q1.get()
-            darkdata2 = q2.get()
-            darkdata3 = q3.get()
-            darkdata4 = q4.get()
+            for x in processes:
+                x.start()
+                
+            for i in range(n):
+                tupel = q.get()
+                current = tupel[0]
+                pos = tupel[1]
+                darkdata = np.concatenate((darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], dark[(pos+1)*amounty//n:amounty]), axis=0)
+            
             [x.join() for x in processes]
             
             darkdata = np.concatenate((darkdata1[0:amounty//4], darkdata2[amounty//4:amounty//2], darkdata3[amounty//2:3*amounty//4], darkdata4[3*amounty//4:amounty]), axis=0)"""
@@ -278,7 +282,7 @@ class ImageCombiner():
                 
 if __name__ == '__main__':
     mp.set_start_method('fork') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
-
+    #Depending on your operating system, only one of the methods may work.
     if debug:
         print("start")
         print(str(progress) + " %")
