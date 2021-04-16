@@ -23,6 +23,8 @@ n=32
 
 progress=0
 
+exp_suit = True #boolean to see wether the exposure times of the main image and the dark frame correspond
+
 #wether or not the program should remove hotpixels or not, depends on wether you need it or not (needs a lot of time, ～1.5-2 min.).
 remove_hotpixels = True
 
@@ -54,6 +56,9 @@ class CalibrationPipe():
         
     #Executes all processes, mainly the multiprocessing for removing hotpixels    
     def run(self):
+        global calibrate_with_dark
+        global calibrate_with_bias
+        global calibrate_with_flat
         if debug:
             print("ruuuuun!")
         imagedata = self.imagedata
@@ -63,6 +68,17 @@ class CalibrationPipe():
         
         amounty=len(imagedata)
         amountx=len(imagedata[0])
+        
+        if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
+            calibrate_with_dark = False
+            
+        if abs(self.imagehdr["EXPTIME"] - self.biashdr["EXPTIME"]) > 1:
+            calibrate_with_bias = False
+
+        if abs(self.imagehdr["EXPTIME"] - self.flathdr["EXPTIME"]) > 1:
+            calibrate_with_flat = False
+            
+        print(bool(calibrate_with_dark), bool(calibrate_with_bias), bool(calibrate_with_flat))
         
         if calibrate_with_dark:
             if debug:
@@ -152,13 +168,13 @@ class CalibrationPipe():
         #Function that scales the dark.
         #ARGUMENTS: The dark as nparray,
         #the x and y coordinate of the bottom left corner of the area of the dark that should be processed,
-        #the x and y scale of the area that should be processed and the multiprocessing queue
-        
+        #the x and y scale of the area that should be processed and the multiprocessing queue.
         if debug:
             print("A process was started")
         
         expt = self.imagehdr["EXPTIME"]
-        scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.darkhdr["EXPTIME"]
+        darkexpt = self.darkhdr["EXPTIME"]
+        scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/darkexpt
         #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual exposuretime of the dark
         #The result is the scaling factor. Each pixel then has to be multiplied with that value.
         
