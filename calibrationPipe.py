@@ -4,7 +4,7 @@
 #If something isn't working as it's supposed to, try:
     #Have a look at #multiprocessing on lines 20-26
     #check if you have all the necessary modules correctly installed (astropy and numpy)
-    #check if you declared your filepaths correctly (image_path and all the ones you set to True)
+    #check if you declared your filepaths correctly (image_path and all the ones you set calibrate_with_[frame] to True)
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
 
 from astropy.io import fits #non-default module, installation required
