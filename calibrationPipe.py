@@ -11,7 +11,7 @@ import statistics
 import time
 import multiprocessing as mp
 #import math
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 #if debug is 'True' it prints some helpful stuff, otherwise not.
 debug = True
@@ -27,7 +27,6 @@ progress=0
 remove_hotpixels = True
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
-calibrate_with_bias = True
 calibrate_with_dark = True
 calibrate_with_flat = True
 
@@ -51,6 +50,7 @@ class CalibrationPipe():
             self.flathdr = flat[0].header
         
         self.imagepath = image_path
+        self.average_dark_pixelvalue = None
         
     #Executes all processes, mainly the multiprocessing for removing hotpixels    
     def run(self):
@@ -67,18 +67,27 @@ class CalibrationPipe():
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
+        
         """if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
             calibrate_with_dark = False
             
         if abs(self.imagehdr["EXPTIME"] - self.biashdr["EXPTIME"]) > 1:
-            calibrate_with_bias = False
+            calibrate_with_dark = False
 
         if abs(self.imagehdr["EXPTIME"] - self.flathdr["EXPTIME"]) > 1:
             calibrate_with_flat = False"""
-            
-        print(bool(calibrate_with_dark), bool(calibrate_with_bias), bool(calibrate_with_flat))
         
         if calibrate_with_dark:
+            # Calculates the average pixelvalue of the darkframe
+            y_averages = []
+            for x in range(amountx):
+                y_values = []
+                for y in range(amounty):
+                    y_values.append(darkdata[y][x])
+                y_averages.append(statistics.mean(y_values))
+            
+            self.average_dark_pixelvalue = np.average(y_averages)
+            
             if debug:
                 print("Starting multiprocessing...")
             q = mp.Queue()
@@ -104,9 +113,13 @@ class CalibrationPipe():
             
             [x.join() for x in processes]
             
+            plt.imshow(darkdata)
+            plt.colorbar(orientation='vertical')
+            plt.show()
+            
             imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
-        if calibrate_with_bias:
+        if calibrate_with_dark:
             imagedata = self.bias_frame(imagedata, biasdata)
             
         if calibrate_with_flat:
@@ -151,7 +164,6 @@ class CalibrationPipe():
             runs.append(process)
         return runs
         
-        
     def verifyDateDark(self):
         if self.imagehdr["DATE"] != self.darkhdr["DATE"]:
             return False
@@ -166,22 +178,21 @@ class CalibrationPipe():
         #Function that scales the dark.
         #ARGUMENTS: The dark as nparray,
         #the x and y coordinate of the bottom left corner of the area of the dark that should be processed,
-        #the x and y scale of the area that should be processed and the multiprocessing queue.
+        #the x and y scale of the area that should be processed and the multiprocessing queue
+        #the number of the process and the average pixelvalue of the darkframe
         if debug:
             print("A process was started")
         
         expt = self.imagehdr["EXPTIME"]
-        darkexpt = self.darkhdr["EXPTIME"]
-        scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/darkexpt
+        #darkexpt = self.darkhdr["EXPTIME"]
+        scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.average_dark_pixelvalue
         #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual exposuretime of the dark
         #The result is the scaling factor. Each pixel then has to be multiplied with that value.
         
         for y in range(amounty):
             for x in range(amountx):
                 darkdata[starty + y, startx + x] *= scaling_factor
-            
-        #if debug:
-            #print(darkdata)
+        
         q.put((darkdata, p))
         if debug:
             print("Process finished")
@@ -299,7 +310,7 @@ class ImageCombiner():
                 master.writeto("masterfile.fts", overwrite=True)
                 
 if __name__ == '__main__':
-    mp.set_start_method('fork') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
+    mp.set_start_method('spawn') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
     #Depending on your operating system, only one of the methods may work.
     if debug:
         print("start")
@@ -311,11 +322,10 @@ if __name__ == '__main__':
     
     if calibrate_with_dark:
         dark_path = 'HAT-P-10-001dark.fit' #The dark image's path as a string
+        bias_path = 'Bias-001.fit' #The bias image's path as a string
+        
     else:
         dark_path = image_path
-    if calibrate_with_bias:
-        bias_path = 'Bias-001.fit' #The bias image's path as a string
-    else:
         bias_path = image_path
     if calibrate_with_flat:
         flat_path = 'HAT-P-10-001light.fit' #The light image's path as a string
@@ -350,8 +360,6 @@ if __name__ == '__main__':
     calibPip.stack_images(imgs, "median")
     calibPip.stack_images(imgs, "average")"""
 
-
-    # calibPip.close()
 
     if debug:
         #print('stashing: ' + str(time.time() - now))
