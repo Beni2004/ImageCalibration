@@ -31,15 +31,15 @@ method = 'fork'
 remove_hotpixels = True #Set this to True or False
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
-calibrate_with_dark = True #Set this to True or False
-calibrate_with_bias = True #Set this to True or False
+calibrate_with_dark = False #Set this to True or False
+calibrate_with_bias = False #Set this to True or False
 calibrate_with_flat = False #leave False normally, don't change this
 
 #Defining files
 #If only the name of the file is given, the program and the file have to be in the same folder.
 #The path can also be given by the file's absolute path: 'folder/folder/folder/.../file' (also for Windows OS use normal slashes, not backslashes)
 
-image_path = 'image.fit' #Put your (relative) path of the main image to be edited
+image_path = 'Master_Blue_M1.fit' #Put your (relative) path of the main image to be edited
 
 if calibrate_with_dark:
     dark_path = 'dark.fit' #Put your dark frame's (relative) path as a string
@@ -144,7 +144,9 @@ class CalibrationPipe():
                 pos = tupel[1]
                 self.darkdata = np.concatenate((self.darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], self.darkdata[(pos+1)*amounty//n:amounty]), axis=0)
             
-            [x.join() for x in processes]
+            for x in processes:
+                x.join()
+                x.terminate()
             
             #subtract the bias from the dark frame and subtract the result from the main image
             self.imagedata = self.dark_frame(self.imagedata, self.darkdata, self.biasdata)
@@ -185,6 +187,10 @@ class CalibrationPipe():
                 current = tupel[0]
                 pos = tupel[1]
                 self.imagedata = np.concatenate((self.imagedata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], self.imagedata[(pos+1)*amounty//n:amounty]), axis=0)
+            
+            for x in processes:
+                x.join()
+                x.terminate()
             
             if debug:
                 print("removal time:", time.time()-t_start)
@@ -272,7 +278,7 @@ class CalibrationPipe():
         Sum=left+right
         av=Sum//2
         value=imagedata[y, x]
-        if value > 1.05*av and av < 5000:
+        if value > 1.05*av and av < 7000:
             imagedata[y, x]=av
         return imagedata
     
