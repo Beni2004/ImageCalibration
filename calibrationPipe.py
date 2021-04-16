@@ -12,7 +12,7 @@ import statistics
 import time
 import multiprocessing as mp
 #import math
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 #if debug is 'True' it prints some helpful stuff to the shell, otherwise not.
 debug = True
@@ -21,53 +21,69 @@ t = time.time()
 
 #number of processes executed at the same time.
 #If something doesn't work, try lower numbers like 2 or 4. 2^n numbers are favorable.
-n=16
+#number of processes executed at the same time
+n=4
 
 progress=0
 
 #wether or not the program should remove hotpixels or not, depends on wether you need it or not (needs a lot of time, ～1.5-2 min.).
-remove_hotpixels = True
+remove_hotpixels = False
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
 calibrate_with_dark = True
-calibrate_with_flat = True
+calibrate_with_bias = True
+calibrate_with_flat = False
 
 class CalibrationPipe():
     #opens all images with their path
-    def __init__(self, image_path, dark_path, bias_path, flat_path):
+    def __init__(self, image_path, dark_path=None, bias_path=None, flat_path=None):
         with fits.open(image_path) as image:
             self.imagedata = image[0].data
             self.imagehdr = image[0].header
-            
-        with fits.open(dark_path) as dark:
-            self.darkdata = dark[0].data
-            self.darkhdr = dark[0].header
         
-        with fits.open(bias_path) as bias:
-            self.biasdata = bias[0].data
-            self.biashdr = bias[0].header
+        if dark_path != None:
+            with fits.open(dark_path) as dark:
+                self.darkdata = dark[0].data
+                self.darkhdr = dark[0].header
+                self.doDark = True
+        else:
+            self.doDark = False
+            self.darkdata = None
+            self.darkhdr = None
         
-        with fits.open(flat_path) as flat:
-            self.flatdata = flat[0].data
-            self.flathdr = flat[0].header
+        if bias_path != None:
+            with fits.open(bias_path) as bias:
+                self.biasdata = bias[0].data
+                self.biashdr = bias[0].header
+                self.doBias = True
+        else:
+            self.doBias = False
+            self.biasdata = None
+            self.biashdr = None
+        
+        if flat_path != None:
+            with fits.open(flat_path) as flat:
+                self.flatdata = flat[0].data
+                self.flathdr = flat[0].header
+                self.doFlat = True
+        else:
+            self.doFlat = False
+            self.flatdata = None
+            self.flathdr = None
         
         self.imagepath = image_path
         self.average_dark_pixelvalue = None
         
     #Executes all processes, mainly the multiprocessing for removing hotpixels    
     def run(self):
-        global calibrate_with_dark
+        """global calibrate_with_dark
         global calibrate_with_bias
-        global calibrate_with_flat
+        global calibrate_with_flat"""
         if debug:
             print("ruuuuun!")
-        imagedata = self.imagedata
-        darkdata = self.darkdata
-        biasdata = self.biasdata
-        flatdata = self.flatdata
         
-        amounty=len(imagedata)
-        amountx=len(imagedata[0])
+        amounty=len(self.imagedata)
+        amountx=len(self.imagedata[0])
         
         
         """if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
@@ -79,13 +95,13 @@ class CalibrationPipe():
         if abs(self.imagehdr["EXPTIME"] - self.flathdr["EXPTIME"]) > 1:
             calibrate_with_flat = False"""
         
-        if calibrate_with_dark:
+        if self.doDark:
             # Calculates the average pixelvalue of the darkframe
             y_averages = []
             for x in range(amountx):
                 y_values = []
                 for y in range(amounty):
-                    y_values.append(darkdata[y][x])
+                    y_values.append(self.darkdata[y][x])
                 y_averages.append(statistics.mean(y_values))
             
             self.average_dark_pixelvalue = np.average(y_averages)
@@ -94,7 +110,7 @@ class CalibrationPipe():
                 print("Starting multiprocessing...")
             q = mp.Queue()
             processes = []
-            runs = self.make_processes(darkdata, amountx, amounty, n, q)
+            runs = self.make_processes(self.darkdata, amountx, amounty, n, q)
             for i in runs:
                 p = mp.Process(target = self.scale_dark, args = i)
                 processes.append(p)
@@ -111,21 +127,23 @@ class CalibrationPipe():
                 tupel = q.get()
                 current = tupel[0]
                 pos = tupel[1]
-                darkdata = np.concatenate((darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], darkdata[(pos+1)*amounty//n:amounty]), axis=0)
+                self.darkdata = np.concatenate((self.darkdata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], self.darkdata[(pos+1)*amounty//n:amounty]), axis=0)
             
             [x.join() for x in processes]
             
-            #plt.imshow(darkdata)
-            #plt.colorbar(orientation='vertical')
-            #plt.show()
+            print(self.darkdata)
             
-            imagedata = self.dark_frame(imagedata, darkdata, biasdata)
+            plt.imshow(self.darkdata)
+            plt.colorbar(orientation='vertical')
+            plt.show()
+            
+            self.imagedata = self.dark_frame(self.imagedata, self.darkdata, self.biasdata)
         
-        if calibrate_with_dark:
-            imagedata = self.bias_frame(imagedata, biasdata)
+        if self.doBias:
+            self.imagedata = self.bias_frame(self.imagedata, self.biasdata)
             
-        if calibrate_with_flat:
-            imagedata = self.flat_frame(imagedata, flatdata)
+        if self.doFlat:
+            self.imagedata = self.flat_frame(self.imagedata, self.flatdata)
         
         if remove_hotpixels:
             if debug:
@@ -133,7 +151,7 @@ class CalibrationPipe():
             q = mp.Queue()
             t_start = time.time()
             processes = []
-            runs = self.make_processes(imagedata, amountx, amounty, n, q)
+            runs = self.make_processes(self.imagedata, amountx, amounty, n, q)
             for i in runs:
                 p = mp.Process(target = self.clean_image, args = i)
                 processes.append(p)
@@ -150,13 +168,13 @@ class CalibrationPipe():
                 tupel = q.get()
                 current = tupel[0]
                 pos = tupel[1]
-                imagedata = np.concatenate((imagedata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], imagedata[(pos+1)*amounty//n:amounty]), axis=0)
+                self.imagedata = np.concatenate((self.imagedata[0:pos*amounty//n], current[pos*amounty//n:(pos+1)*amounty//n], self.imagedata[(pos+1)*amounty//n:amounty]), axis=0)
             
             if debug:
                 print("removal time:", time.time()-t_start)
         
         with fits.open(self.imagepath) as image:
-            image[0].data = imagedata
+            image[0].data = self.imagedata
             image.writeto("output.fts", overwrite=True)
             
     def make_processes(self, imagedata, amountx, amounty, number, q):
@@ -188,12 +206,13 @@ class CalibrationPipe():
         expt = self.imagehdr["EXPTIME"]
         #darkexpt = self.darkhdr["EXPTIME"]
         scaling_factor = (-0.000629169*(expt ** 2) + 0.147650091*expt + 1023.13674955)/self.average_dark_pixelvalue
-        #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual exposuretime of the dark
+        #This calculates the average pixelvalue that a dark with given exposuretime should have divided by the actual average pixelvalue of the dark
         #The result is the scaling factor. Each pixel then has to be multiplied with that value.
         
         for y in range(amounty):
             for x in range(amountx):
-                darkdata[starty + y, startx + x] *= scaling_factor
+                darkdata[starty + y][startx + x] *= scaling_factor
+                # darkdata[starty + y][startx + x] = 30000
         
         q.put((darkdata, p))
         if debug:
@@ -216,7 +235,8 @@ class CalibrationPipe():
         #Subtracts the BIAS-frame from the darkframe and then subtracts the result from the image
         #In other words: Calibrates the dark with the BIAS-frame and then subtracts the dark.
         #Takes two nparrays as arguments
-        darkdata = np.subtract(darkdata, biasdata)
+        if self.doBias:
+            darkdata = np.subtract(darkdata, biasdata)
         imagedata = np.subtract(imagedata, darkdata)
         return imagedata
             
@@ -312,7 +332,7 @@ class ImageCombiner():
                 master.writeto("masterfile.fts", overwrite=True)
                 
 if __name__ == '__main__':
-    mp.set_start_method('fork') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
+    mp.set_start_method('spawn') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
     #Depending on your operating system, only one of the methods may work.
     if debug:
         print("start")
@@ -324,15 +344,18 @@ if __name__ == '__main__':
     
     if calibrate_with_dark:
         dark_path = 'HAT-P-10-001dark.fit' #The dark image's path as a string
-        bias_path = 'Bias-001.fit' #The bias image's path as a string
-        
     else:
-        dark_path = image_path
-        bias_path = image_path
+        dark_path = None
+    
+    if calibrate_with_bias:
+        bias_path = 'Bias-001.fit' #The bias image's path as a string
+    else: 
+        bias_path = None
+    
     if calibrate_with_flat:
         flat_path = 'HAT-P-10-001light.fit' #The light image's path as a string
     else:
-        flat_path = image_path
+        flat_path = None
 
     calibPip = CalibrationPipe(image_path, dark_path, bias_path, flat_path)
     
