@@ -1,7 +1,7 @@
 #Contributors: Benjamin A. and Simon H.
 #For Questions, feel free to contact imagecalibration-contributors@outlook.com
 #If something isn't working as it's supposed to, try:
-    #Have a look at line 291
+    #Have a look at line 304
     #check if you have all the necessary modules correctly installed
     #check if you declared your filepaths correctly
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
@@ -69,14 +69,14 @@ class CalibrationPipe():
         amounty=len(imagedata)
         amountx=len(imagedata[0])
         
-        if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
+        """if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
             calibrate_with_dark = False
             
         if abs(self.imagehdr["EXPTIME"] - self.biashdr["EXPTIME"]) > 1:
             calibrate_with_bias = False
 
         if abs(self.imagehdr["EXPTIME"] - self.flathdr["EXPTIME"]) > 1:
-            calibrate_with_flat = False
+            calibrate_with_flat = False"""
             
         print(bool(calibrate_with_dark), bool(calibrate_with_bias), bool(calibrate_with_flat))
         
