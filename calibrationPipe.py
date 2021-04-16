@@ -1,41 +1,66 @@
 #Contributors: Benjamin A. and Simon H.
 #For Questions, feel free to contact imagecalibration-contributors@outlook.com
-#put in your file paths starting from line 321
+#put in your file paths starting from line 41
 #If something isn't working as it's supposed to, try:
-    #Have a look at lines 23 and 315
-    #check if you have all the necessary modules correctly installed
-    #check if you declared your filepaths correctly
+    #Have a look at #multiprocessing on lines 20-26
+    #check if you have all the necessary modules correctly installed (astropy and numpy)
+    #check if you declared your filepaths correctly (image_path and all the ones you set to True)
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
-from astropy.io import fits
-import numpy as np
-import statistics
-import time
-import multiprocessing as mp
-#import math
-import matplotlib.pyplot as plt
 
+from astropy.io import fits #non-default module, installation required
+import numpy as np #non-default module, installation required
+import statistics #default module, no installation required
+import time #default module, no installation required
+import multiprocessing as mp #default module, no installation required
+
+#debug
 #if debug is 'True' it prints some helpful stuff to the shell, otherwise not.
-debug = True
+debug = True #Set this to True or False
 
-t = time.time()
-
-#number of processes executed at the same time.
+#multiprocessing
+n=16 #number of processes executed at the same time
 #If something doesn't work, try lower numbers like 2 or 4. 2^n numbers are favorable.
-#number of processes executed at the same time
-n=4
 
-progress=0
+method = 'fork'
+#Maybe try both methods: 'fork' and 'spawn', it can lead to the program being faster or just working at all.
+#Depending on your operating system, only one of the methods may work.
 
-#wether or not the program should remove hotpixels or not, depends on wether you need it or not (needs a lot of time, ～1.5-2 min.).
-remove_hotpixels = False
+#boolean inputs
+#wether or not the program should remove hotpixels or not, depends on wether you need it or not (would require most of the time, ～1.5-2 min.).
+#If you have a dark frame to subtract, this may not be necessary
+remove_hotpixels = True #Set this to True or False
 
 #wether or not the program should do the calibration, i.e. bias, dark, flat, depends on wether you need it and have the necessary files.
-calibrate_with_dark = True
-calibrate_with_bias = True
-calibrate_with_flat = False
+calibrate_with_dark = True #Set this to True or False
+calibrate_with_bias = True #Set this to True or False
+calibrate_with_flat = False #leave False normally, don't change this
+
+#Defining files
+#If only the name of the file is given, the program and the file have to be in the same folder.
+#The path can also be given by the file's absolute path: 'folder/folder/folder/.../file' (also for Windows OS use normal slashes, not backslashes)
+
+image_path = 'image.fit' #Put your (relative) path of the main image to be edited
+
+if calibrate_with_dark:
+    dark_path = 'dark.fit' #Put your dark frame's (relative) path as a string
+else:
+    dark_path = None
+
+if calibrate_with_bias:
+    bias_path = 'bias.fit' #Put your bias frame's (relative) path as a string
+else: 
+    bias_path = None
+
+if calibrate_with_flat:
+    flat_path = 'flat.fit' #Put your flat frame's (relative) path as a string
+else:
+    flat_path = None
+    
+t = time.time()
+progress=0 #starting variables to see the progress and the total time needed in the end.
 
 class CalibrationPipe():
-    #opens all images with their path
+    #opens all images with their path if they are given. If not, they are not opened.
     def __init__(self, image_path, dark_path=None, bias_path=None, flat_path=None):
         with fits.open(image_path) as image:
             self.imagedata = image[0].data
@@ -74,29 +99,16 @@ class CalibrationPipe():
         self.imagepath = image_path
         self.average_dark_pixelvalue = None
         
-    #Executes all processes, mainly the multiprocessing for removing hotpixels    
+    #Executes all processes, mainly the multiprocessing for scaling the dark frame and removing hotpixels    
     def run(self):
-        """global calibrate_with_dark
-        global calibrate_with_bias
-        global calibrate_with_flat"""
         if debug:
             print("ruuuuun!")
         
         amounty=len(self.imagedata)
         amountx=len(self.imagedata[0])
         
-        
-        """if abs(self.imagehdr["EXPTIME"] - self.darkhdr["EXPTIME"]) > 1:
-            calibrate_with_dark = False
-            
-        if abs(self.imagehdr["EXPTIME"] - self.biashdr["EXPTIME"]) > 1:
-            calibrate_with_dark = False
-
-        if abs(self.imagehdr["EXPTIME"] - self.flathdr["EXPTIME"]) > 1:
-            calibrate_with_flat = False"""
-        
+        # Calculates the average pixelvalue of the darkframe
         if self.doDark:
-            # Calculates the average pixelvalue of the darkframe
             y_averages = []
             for x in range(amountx):
                 y_values = []
@@ -106,6 +118,7 @@ class CalibrationPipe():
             
             self.average_dark_pixelvalue = np.average(y_averages)
             
+            #defining the processes
             if debug:
                 print("Starting multiprocessing...")
             q = mp.Queue()
@@ -117,12 +130,14 @@ class CalibrationPipe():
                 if debug:
                     print("Iteration")
             
+            #starting the processes
             for x in processes:
                 x.start()
                 
             if debug:
                 print("All processes should have started now")
                 
+            #Get the resulting values from the calculation and define the new dark frame
             for i in range(n):
                 tupel = q.get()
                 current = tupel[0]
@@ -131,21 +146,20 @@ class CalibrationPipe():
             
             [x.join() for x in processes]
             
-            print(self.darkdata)
-            
-            plt.imshow(self.darkdata)
-            plt.colorbar(orientation='vertical')
-            plt.show()
-            
+            #subtract the bias from the dark frame and subtract the result from the main image
             self.imagedata = self.dark_frame(self.imagedata, self.darkdata, self.biasdata)
         
+        #subtract the bias frame from the main image
         if self.doBias:
             self.imagedata = self.bias_frame(self.imagedata, self.biasdata)
             
+        #subtract the flat frame from the main image
         if self.doFlat:
             self.imagedata = self.flat_frame(self.imagedata, self.flatdata)
         
+        #removes the hotpixels in the whole image
         if remove_hotpixels:
+            #defining the processes
             if debug:
                 print("Starting multiprocessing...")
             q = mp.Queue()
@@ -158,12 +172,14 @@ class CalibrationPipe():
                 if debug:
                     print("Iteration")
             
+            #starting the processes
             for x in processes:
                 x.start()
                 
             if debug:
                 print("All processes should have started now")
 
+            #Get the resulting values from the calculation and define the new main image
             for i in range(n):
                 tupel = q.get()
                 current = tupel[0]
@@ -173,10 +189,15 @@ class CalibrationPipe():
             if debug:
                 print("removal time:", time.time()-t_start)
         
+        #Writes the resulting data to a new file called output.fit in the same folder as the program.
+        #If there already exists a file with this name in this folder, it will be overwritten.
         with fits.open(self.imagepath) as image:
             image[0].data = self.imagedata
-            image.writeto("output.fts", overwrite=True)
+            image.writeto("output.fit", overwrite=True)
             
+    #creates the processes for the multiprocessing
+    #takes an nparray as the image, the length of the process in the x and y direction, the number of processes (an integer) and the multiprocessing-queue.
+    #returns a list with all processes
     def make_processes(self, imagedata, amountx, amounty, number, q):
         runs = []
         for i in range(number):
@@ -256,7 +277,7 @@ class CalibrationPipe():
         return imagedata
     
     #Runs the hotpixel check for every pixel in the image, except if the maximum y-coordinate is reached.
-    #Four processes are running simultaniously due to multiprocessing. Hence the y-axis is divided four times.
+    #Many (n) processes are running simultaniously due to multiprocessing. Hence the y-axis is divided n-times.
     #It calculates the progress of the current process. If the process has gone further than 5 % since the last print, it prints the progress.
     def clean_image(self, imagedata, startx, starty, amountx, amounty, q, p):
         global progress
@@ -280,7 +301,7 @@ class CalibrationPipe():
             print("Process finished")
         
 class ImageCombiner():
-    #This class contains a function to combine images
+    #This class contains a function to combine images, currently not in use.
     def __init__(self):
         pass
         
@@ -326,36 +347,16 @@ class ImageCombiner():
             if debug:
                 print(stacked_images)
             
-#runs the multiprocessing
             with fits.open(master_image_path) as master:
                 master[0].data = master_image_data
                 master.writeto("masterfile.fts", overwrite=True)
-                
+
+#runs the multiprocessing                
 if __name__ == '__main__':
-    mp.set_start_method('spawn') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
-    #Depending on your operating system, only one of the methods may work.
+    mp.set_start_method(method)
     if debug:
         print("start")
         print(str(progress) + " %")
-    
-    image_path = '2021-04-02T19-10-26_M1_Clear_280s_Simon-H.fts' #relative path of the main image to be edited
-    #If only the name of the file is given, the program and the file have to be in the same folder.
-    #The path can also be given by the files absolute path: 'folder/folder/folder/.../file', also for Windows use normal slashes
-    
-    if calibrate_with_dark:
-        dark_path = 'HAT-P-10-001dark.fit' #The dark image's path as a string
-    else:
-        dark_path = None
-    
-    if calibrate_with_bias:
-        bias_path = 'Bias-001.fit' #The bias image's path as a string
-    else: 
-        bias_path = None
-    
-    if calibrate_with_flat:
-        flat_path = 'HAT-P-10-001light.fit' #The light image's path as a string
-    else:
-        flat_path = None
 
     calibPip = CalibrationPipe(image_path, dark_path, bias_path, flat_path)
     
