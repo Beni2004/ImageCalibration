@@ -23,8 +23,6 @@ n=32
 
 progress=0
 
-exp_suit = True #boolean to see wether the exposure times of the main image and the dark frame correspond
-
 #wether or not the program should remove hotpixels or not, depends on wether you need it or not (needs a lot of time, ～1.5-2 min.).
 remove_hotpixels = True
 
