@@ -1,7 +1,8 @@
 #Contributors: Benjamin A. and Simon H.
 #For Questions, feel free to contact imagecalibration-contributors@outlook.com
+#put in your file paths starting from line 321
 #If something isn't working as it's supposed to, try:
-    #Have a look at line 304
+    #Have a look at lines 23 and 315
     #check if you have all the necessary modules correctly installed
     #check if you declared your filepaths correctly
 #While the program is running, it only prints the progress of the hotpixel removal, not the progress of the whole process.
@@ -11,15 +12,16 @@ import statistics
 import time
 import multiprocessing as mp
 #import math
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 
-#if debug is 'True' it prints some helpful stuff, otherwise not.
+#if debug is 'True' it prints some helpful stuff to the shell, otherwise not.
 debug = True
 
 t = time.time()
 
-#number of processes executed at the same time
-n=32
+#number of processes executed at the same time.
+#If something doesn't work, try lower numbers like 2 or 4. 2^n numbers are favorable.
+n=16
 
 progress=0
 
@@ -113,9 +115,9 @@ class CalibrationPipe():
             
             [x.join() for x in processes]
             
-            plt.imshow(darkdata)
-            plt.colorbar(orientation='vertical')
-            plt.show()
+            #plt.imshow(darkdata)
+            #plt.colorbar(orientation='vertical')
+            #plt.show()
             
             imagedata = self.dark_frame(imagedata, darkdata, biasdata)
         
@@ -310,7 +312,7 @@ class ImageCombiner():
                 master.writeto("masterfile.fts", overwrite=True)
                 
 if __name__ == '__main__':
-    mp.set_start_method('spawn') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
+    mp.set_start_method('fork') #Maybe try both methods 'fork' and 'spawn', it can lead to the program being faster or just working at all.
     #Depending on your operating system, only one of the methods may work.
     if debug:
         print("start")
@@ -335,31 +337,6 @@ if __name__ == '__main__':
     calibPip = CalibrationPipe(image_path, dark_path, bias_path, flat_path)
     
     calibPip.run()
-
-    """timeStats = []
-    startTime = time.time()
-    imgs = [c, c]
-    calibPip.stack_images(imgs, "median")
-    timeStats.append(time.time() - startTime)
-
-    startTime = time.time()
-    imgs = [c, c, c]
-    calibPip.stack_images(imgs, "median")
-    timeStats.append(time.time() - startTime)
-
-    startTime = time.time()
-    imgs = [c, c, c, c]
-    calibPip.stack_images(imgs, "median")
-    timeStats.append(time.time() - startTime)
-
-    plt.plot([1,2,3], timeStats)
-    plt.show()"""
-
-    """now=time.time()
-    imgs = [fits.open(image_path), e]
-    calibPip.stack_images(imgs, "median")
-    calibPip.stack_images(imgs, "average")"""
-
 
     if debug:
         #print('stashing: ' + str(time.time() - now))
